@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: revenue_recognition
+      POSTGRES_USER: rruser
+      POSTGRES_PASSWORD: rrpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rruser -d revenue_recognition"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  processing-engine:
+    build: ./processing-engine
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://rruser:rrpassword@postgres:5432/revenue_recognition
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./processing-engine:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  api-layer:
+    build: ./api-layer
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://rruser:rrpassword@postgres:5432/revenue_recognition
+      REDIS_URL: redis://redis:6379
+      PROCESSING_ENGINE_URL: http://processing-engine:8000
+      JWT_SECRET: your-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+      - processing-engine
+    volumes:
+      - ./api-layer:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - api-layer
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
