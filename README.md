@@ -1,6 +1,8 @@
 # Revenue Recognition Automation Engine
 
-Automates ASC 606 / IFRS 15 revenue recognition for B2B SaaS contracts. Takes raw customer contracts and transaction data and produces compliant revenue schedules with a full audit trail — replacing a process that is otherwise done manually in spreadsheets.
+Automates ASC 606 / IFRS 15 revenue recognition for B2B SaaS contracts. Takes raw customer contracts and transaction data and produces compliant revenue schedules with a full audit trail.
+
+![](images/sc.png)
 
 ## What it does
 
